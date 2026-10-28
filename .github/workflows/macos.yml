@@ -129,7 +129,7 @@ jobs:
           sleep 3
           printf 'no-such-package-for-this-test==1.0\n' > out/bad-requirements.txt
           # (no app open: a process number that is not running; no bundle id: the app is not opened again)
-          MACAPP_DATA="$DATA" MACAPP_UV="$DATA/bin/uv" MACAPP_BUNDLE_ID="" \
+          UPD_QUIET=1 MACAPP_DATA="$DATA" MACAPP_UV="$DATA/bin/uv" MACAPP_BUNDLE_ID="" \
             "$DATA/env/bin/python" -m standin_app.update out/v2/*.whl out/bad-requirements.txt --wait-pid 99999
           for i in $(seq 1 120); do grep -q FAILED "$DATA/update.log" && ! pgrep -f macos_update.sh && break; sleep 2; done
           tail -5 "$DATA/update.log"
