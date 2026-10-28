@@ -20,12 +20,13 @@ say() {   # a notification; nothing when there is no GUI session
 give_numba_openmp() {
     # numba's macOS wheel loads @rpath/libomp.dylib for its thread-safe OpenMP layer but does not ship it (without
     # it numba runs parallel kernels on workqueue, which ends the process when two threads launch them at once).
-    # @rpath leads to the Python's own lib folder: PyTorch's libomp.dylib is copied there.
+    # @rpath leads to the Python's own lib folder: a link to PyTorch's libomp.dylib is put there -- a link, not a
+    # copy: two copies in one process (PyTorch's and numba's) end it ("OMP: Error #15 ... already initialized").
     local python="$1" lib omp
     lib="$("$python" -c 'import os, sys; print(os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(sys.executable))), "lib"))')"
     omp="$("$python" -c 'import glob, os, importlib.util as u; s = u.find_spec("torch"); print((glob.glob(os.path.join(s.submodule_search_locations[0], "lib", "libomp*.dylib")) or [""])[0] if s else "")')"
     if [ -n "$omp" ] && [ -d "$lib" ]; then
-        cp -f "$omp" "$lib/libomp.dylib" && echo "numba's OpenMP: $omp -> $lib/libomp.dylib"
+        ln -sf "$omp" "$lib/libomp.dylib" && echo "numba's OpenMP: $lib/libomp.dylib -> $omp"
     else
         echo "numba's OpenMP: no libomp.dylib to give it (torch: '$omp', lib: '$lib')"
     fi
