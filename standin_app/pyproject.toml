@@ -12,3 +12,6 @@ dependencies = ["numpy", "numba", "torch", "pyside6", "scikit-learn"]
 
 [tool.setuptools]
 packages = ["standin_app"]
+
+[tool.setuptools.package-data]
+standin_app = ["macos_update.sh"]

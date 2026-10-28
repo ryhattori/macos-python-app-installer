@@ -81,6 +81,44 @@ jobs:
           print("survived")
           EOF
 
+      - name: An update from within the app (0.1.0 -> 0.2.0), installed once the app has quit
+        run: |
+          DATA=~/Library/Application\ Support/StandIn
+          sed -i '' 's/^version = "0.1.0"/version = "0.2.0"/' standin_app/pyproject.toml
+          "$DATA/bin/uv" build --wheel --out-dir out/v2 standin_app
+          git checkout standin_app/pyproject.toml
+          ~/Applications/StandIn.app/Contents/MacOS/StandIn &        # the app, open
+          app=$!
+          sleep 10
+          # its Updates button: the same Python, with the variables its launcher set
+          MACAPP_DATA="$DATA" MACAPP_UV="$DATA/bin/uv" MACAPP_BUNDLE_ID=io.github.ryhattori.standin \
+            "$DATA/env/bin/python" -m standin_app.update out/v2/*.whl installer/requirements.txt --wait-pid $app
+          kill $app                                                     # the app quits
+          for i in $(seq 1 300); do grep -qE "=== .* updated|FAILED" "$DATA/update.log" && break; sleep 2; done
+          cat "$DATA/update.log" | grep -vE "^ [+-] |^(Resolved|Prepared|Installed|Uninstalled|Audited|Checked)"
+          "$DATA/env/bin/python" -c "from importlib import metadata; v = metadata.version('standin-app'); print('installed', v); assert v == '0.2.0'"
+          cat "$DATA/env/.bundle_id"
+          # opened again by the update (open -b): its process appears
+          for i in $(seq 1 30); do pgrep -f "$DATA/env/bin/python" && break; sleep 2; done
+          sleep 8
+          screencapture -x out/after_update.png || true
+          pkill -f "$DATA/env/bin/python" || true
+          ls "$DATA"
+
+      - name: A failing update leaves the app as it was
+        run: |
+          DATA=~/Library/Application\ Support/StandIn
+          sleep 3
+          printf 'no-such-package-for-this-test==1.0\n' > out/bad-requirements.txt
+          # (no app open: a process number that is not running; no bundle id: the app is not opened again)
+          MACAPP_DATA="$DATA" MACAPP_UV="$DATA/bin/uv" MACAPP_BUNDLE_ID="" \
+            "$DATA/env/bin/python" -m standin_app.update out/v2/*.whl out/bad-requirements.txt --wait-pid 99999
+          for i in $(seq 1 120); do [ "$(grep -c FAILED "$DATA/update.log")" -ge 1 ] && break; sleep 2; done
+          tail -5 "$DATA/update.log"
+          grep -q "FAILED: the packages could not be installed" "$DATA/update.log"
+          test ! -e "$DATA/env.update"
+          "$DATA/env/bin/python" -c "from importlib import metadata; v = metadata.version('standin-app'); print('still', v); assert v == '0.2.0'"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

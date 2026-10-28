@@ -30,7 +30,8 @@ cp "$TMP"/uv-aarch64-apple-darwin/uv "$APP/Contents/Resources/uv"
 cp installer/requirements.txt "$APP/Contents/Resources/requirements.txt"
 echo "$VERSION-$(date -u +%Y%m%d%H%M%S)" > "$APP/Contents/Resources/build_id"
 
-sed -e "s/@APP_NAME@/$NAME/" -e "s/@APP_MODULE@/$MODULE/" installer/launcher.sh > "$APP/Contents/MacOS/$NAME"
+sed -e "s/@APP_NAME@/$NAME/" -e "s/@APP_MODULE@/$MODULE/" -e "s/@BUNDLE_ID@/$BUNDLE_ID/" installer/launcher.sh \
+    > "$APP/Contents/MacOS/$NAME"
 chmod +x "$APP/Contents/MacOS/$NAME" "$APP/Contents/Resources/uv"
 
 cat > "$APP/Contents/Info.plist" <<PLIST

@@ -14,8 +14,10 @@ from pathlib import Path
 
 
 def report() -> dict:
-    out = {"python": sys.version.split()[0], "executable": sys.executable, "platform": platform.platform(),
-           "machine": platform.machine()}
+    from importlib import metadata
+
+    out = {"app_version": metadata.version("standin-app"), "python": sys.version.split()[0],
+           "executable": sys.executable, "platform": platform.platform(), "machine": platform.machine()}
     t0 = time.perf_counter()
     import torch
 

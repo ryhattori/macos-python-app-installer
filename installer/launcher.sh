@@ -1,7 +1,9 @@
 #!/bin/bash
-# The app's executable (Contents/MacOS/<name>). The first launch -- and the first after an update of the app -- sets
-# up the Python environment in ~/Library/Application Support/<name>: uv (inside the app) installs Python 3.11 and
-# the pinned packages; later launches start the app at once. Arguments are passed to the app.
+# The app's executable (Contents/MacOS/<name>). The first launch of an app copy -- a fresh install, or a newer
+# download of the app -- sets up the Python environment in ~/Library/Application Support/<name>: uv (inside the app)
+# installs Python 3.11, the pinned packages and the app's package. Later launches start the app at once. Updates
+# installed from within the app (macos_update.sh) change the environment, not this app copy: the environment records
+# which app copy set it up (.bundle_id), so they are not undone. Arguments are passed to the app.
 set -u
 NAME="@APP_NAME@"
 MODULE="@APP_MODULE@"
@@ -33,26 +35,29 @@ give_numba_openmp() {
     return 0
 }
 
-if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.build_id" 2>/dev/null)" != "$BUILD" ]; then
+if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.bundle_id" 2>/dev/null)" != "$BUILD" ]; then
     say "Setting up $NAME (first launch, a few minutes)..."
     {
-        echo "=== $(date) setting up build $BUILD"
+        echo "=== $(date) setting up from the app copy $BUILD"
         export UV_PYTHON_INSTALL_DIR="$DATA/python" UV_CACHE_DIR="$DATA/cache" UV_NO_CONFIG=1
-        "$RES/uv" python install 3.11 --no-bin &&
+        mkdir -p "$DATA/bin" && cp -f "$RES/uv" "$DATA/bin/uv" &&      # uv for updates, wherever the app is
+        "$DATA/bin/uv" python install 3.11 --no-bin &&
         rm -rf "$ENV.new" &&
-        "$RES/uv" venv --python 3.11 "$ENV.new" &&
-        "$RES/uv" pip install --python "$ENV.new/bin/python" -r "$RES/requirements.txt" &&
-        "$RES/uv" pip install --python "$ENV.new/bin/python" --no-deps "$RES"/wheels/*.whl &&
+        "$DATA/bin/uv" venv --python 3.11 "$ENV.new" &&
+        "$DATA/bin/uv" pip install --python "$ENV.new/bin/python" -r "$RES/requirements.txt" &&
+        "$DATA/bin/uv" pip install --python "$ENV.new/bin/python" --no-deps "$RES"/wheels/*.whl &&
         rm -rf "$ENV" && mv "$ENV.new" "$ENV" &&
         give_numba_openmp "$ENV/bin/python" &&          # (after the move: the link names the environment's torch)
-        echo "$BUILD" > "$ENV/.build_id"
+        echo "$BUILD" > "$ENV/.bundle_id"
         rm -rf "$DATA/cache"                      # the downloads (as large as the environment): not needed again
     } >> "$LOG" 2>&1
-    if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.build_id" 2>/dev/null)" != "$BUILD" ]; then
+    if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.bundle_id" 2>/dev/null)" != "$BUILD" ]; then
         /usr/bin/osascript -e "display alert \"$NAME could not be set up\" message \"See $LOG\"" >/dev/null 2>&1 \
             || echo "$NAME could not be set up: see $LOG" >&2
         exit 1
     fi
     say "$NAME is ready."
 fi
+# What the app needs to update itself (macos_update.sh): where its data is, uv, its bundle identifier, the app copy.
+export MACAPP_DATA="$DATA" MACAPP_UV="$DATA/bin/uv" MACAPP_BUNDLE_ID="@BUNDLE_ID@" MACAPP_BUNDLE="$(dirname "$CONTENTS")"
 exec "$ENV/bin/python" -m "$MODULE" "$@"
