@@ -49,9 +49,13 @@ def main(argv=None) -> int:
     parser.add_argument("--selftest", metavar="DIR", help="show the window briefly, save its picture and report.json")
     args = parser.parse_args(argv)
     info = report()
+    from standin_app.macos import set_app_name
+
+    info["app_name_set"] = set_app_name("StandIn")      # the menu bar's and Dock's name, not "python"
     from PySide6 import QtCore, QtWidgets
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv[:1])
+    app.setApplicationDisplayName("StandIn")
     window = QtWidgets.QMainWindow()
     window.setWindowTitle("Stand-in app")
     text = QtWidgets.QPlainTextEdit(json.dumps(info, indent=1))

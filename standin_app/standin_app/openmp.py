@@ -59,7 +59,7 @@ def _run(how, env=None):
     done = subprocess.run([sys.executable, "-c", PROBE, how], capture_output=True, text=True, env=env)
     line = done.stdout.strip().splitlines()[-1] if done.stdout.strip() else ""
     if "|" not in line:
-        return {"how": how, "layer": None, "detail": done.stderr.strip()[-400:]}
+        return {"how": how, "layer": None, "detail": f"exit {done.returncode}: {done.stderr.strip()[-400:]}"}
     _how, layer, detail = line.split("|", 2)
     return {"how": how, "layer": layer, "detail": detail}
 

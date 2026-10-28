@@ -17,6 +17,21 @@ say() {   # a notification; nothing when there is no GUI session
     /usr/bin/osascript -e "display notification \"$1\" with title \"$NAME\"" >/dev/null 2>&1 || true
 }
 
+give_numba_openmp() {
+    # numba's macOS wheel loads @rpath/libomp.dylib for its thread-safe OpenMP layer but does not ship it (without
+    # it numba runs parallel kernels on workqueue, which ends the process when two threads launch them at once).
+    # @rpath leads to the Python's own lib folder: PyTorch's libomp.dylib is copied there.
+    local python="$1" lib omp
+    lib="$("$python" -c 'import os, sys; print(os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(sys.executable))), "lib"))')"
+    omp="$("$python" -c 'import glob, os, importlib.util as u; s = u.find_spec("torch"); print((glob.glob(os.path.join(s.submodule_search_locations[0], "lib", "libomp*.dylib")) or [""])[0] if s else "")')"
+    if [ -n "$omp" ] && [ -d "$lib" ]; then
+        cp -f "$omp" "$lib/libomp.dylib" && echo "numba's OpenMP: $omp -> $lib/libomp.dylib"
+    else
+        echo "numba's OpenMP: no libomp.dylib to give it (torch: '$omp', lib: '$lib')"
+    fi
+    return 0
+}
+
 if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.build_id" 2>/dev/null)" != "$BUILD" ]; then
     say "Setting up $NAME (first launch, a few minutes)..."
     {
@@ -27,8 +42,10 @@ if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.build_id" 2>/dev/null)" != "$BU
         "$RES/uv" venv --python 3.11 "$ENV.new" &&
         "$RES/uv" pip install --python "$ENV.new/bin/python" -r "$RES/requirements.txt" &&
         "$RES/uv" pip install --python "$ENV.new/bin/python" --no-deps "$RES"/wheels/*.whl &&
+        give_numba_openmp "$ENV.new/bin/python" &&
         echo "$BUILD" > "$ENV.new/.build_id" &&
         rm -rf "$ENV" && mv "$ENV.new" "$ENV"
+        rm -rf "$DATA/cache"                      # the downloads (as large as the environment): not needed again
     } >> "$LOG" 2>&1
     if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.build_id" 2>/dev/null)" != "$BUILD" ]; then
         /usr/bin/osascript -e "display alert \"$NAME could not be set up\" message \"See $LOG\"" >/dev/null 2>&1 \

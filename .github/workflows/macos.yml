@@ -58,6 +58,29 @@ jobs:
       - name: numba's threading layer -- which way gives it OpenMP
         run: ~/Library/Application\ Support/StandIn/env/bin/python -m standin_app.openmp | tee out/numba_layers.txt
 
+      - name: Two threads launching numba parallel kernels at once (ends the process on workqueue)
+        run: |
+          ~/Library/Application\ Support/StandIn/env/bin/python - <<'EOF'
+          import threading, numpy as np, numba
+
+          @numba.njit(parallel=True)
+          def busy(a):
+              s = 0.0
+              for i in numba.prange(a.shape[0]):
+                  s += np.sqrt(a[i])
+              return s
+
+          a = np.random.rand(1_000_000)
+          busy(a)
+          print("layer:", numba.threading_layer())
+          t = threading.Thread(target=lambda: [busy(a) for _ in range(300)])
+          t.start()
+          while t.is_alive():
+              busy(a)
+          t.join()
+          print("survived")
+          EOF
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
