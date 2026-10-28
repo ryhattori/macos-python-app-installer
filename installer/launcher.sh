@@ -43,9 +43,9 @@ if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.build_id" 2>/dev/null)" != "$BU
         "$RES/uv" venv --python 3.11 "$ENV.new" &&
         "$RES/uv" pip install --python "$ENV.new/bin/python" -r "$RES/requirements.txt" &&
         "$RES/uv" pip install --python "$ENV.new/bin/python" --no-deps "$RES"/wheels/*.whl &&
-        give_numba_openmp "$ENV.new/bin/python" &&
-        echo "$BUILD" > "$ENV.new/.build_id" &&
-        rm -rf "$ENV" && mv "$ENV.new" "$ENV"
+        rm -rf "$ENV" && mv "$ENV.new" "$ENV" &&
+        give_numba_openmp "$ENV/bin/python" &&          # (after the move: the link names the environment's torch)
+        echo "$BUILD" > "$ENV/.build_id"
         rm -rf "$DATA/cache"                      # the downloads (as large as the environment): not needed again
     } >> "$LOG" 2>&1
     if [ ! -x "$ENV/bin/python" ] || [ "$(cat "$ENV/.build_id" 2>/dev/null)" != "$BUILD" ]; then
