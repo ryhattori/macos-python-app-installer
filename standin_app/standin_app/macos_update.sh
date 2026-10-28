@@ -18,6 +18,7 @@
 #   UPD_WARM           a module run in the new environment after it is in place (optional; failures ignored)
 #   UPD_BUNDLE_ID      the app's bundle identifier, to open it again (optional)
 #   UPD_NO_RESTART     set: do not open the app again
+#   UPD_QUIET          set: no notifications or alerts (an alert waits for a click: tests)
 set -u
 : "${UPD_NAME:?}" "${UPD_DATA:?}" "${UPD_UV:?}" "${UPD_REQUIREMENTS:?}" "${UPD_PACKAGE:?}" "${UPD_PACKAGE_NAME:?}"
 : "${UPD_MODULE:?}" "${UPD_LOG:?}"
@@ -28,6 +29,7 @@ exec >> "$UPD_LOG" 2>&1
 echo "=== $(date) updating $UPD_NAME from $UPD_PACKAGE"
 
 notify() {
+    [ -n "${UPD_QUIET:-}" ] && return 0
     /usr/bin/osascript -e "display notification \"$1\" with title \"$UPD_NAME\"" >/dev/null 2>&1 || true
 }
 
@@ -48,7 +50,7 @@ fail() {
     rm -rf "$NEW"
     tidy
     echo "FAILED: $1"
-    /usr/bin/osascript -e "display alert \"$UPD_NAME was not updated\" message \"$1. $UPD_NAME is as it was before. Details: $UPD_LOG\"" \
+    [ -n "${UPD_QUIET:-}" ] || /usr/bin/osascript -e "display alert \"$UPD_NAME was not updated\" message \"$1. $UPD_NAME is as it was before. Details: $UPD_LOG\"" \
         >/dev/null 2>&1 || true
     reopen
     exit 1

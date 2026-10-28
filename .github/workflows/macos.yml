@@ -31,6 +31,17 @@ jobs:
           codesign -dv ~/Applications/StandIn.app 2>&1 || true
           xattr -dr com.apple.quarantine ~/Applications/StandIn.app   # (what "Open Anyway" amounts to)
 
+      - name: An unsigned zip made without macOS tools (as one built on Windows), unzipped as a user would
+        run: |
+          python3 installer/zip_app.py dist/StandIn.app dist/StandIn-unsigned.zip
+          mkdir -p ~/Unzipped
+          ditto -x -k dist/StandIn-unsigned.zip ~/Unzipped      # (what Archive Utility, a double-click, does)
+          ls -la ~/Unzipped/StandIn.app/Contents/MacOS ~/Unzipped/StandIn.app/Contents/Resources
+          codesign -dv ~/Unzipped/StandIn.app 2>&1 || true
+          xattr -w com.apple.quarantine "0083;$(printf %x $(date +%s));Safari;" ~/Unzipped/StandIn.app
+          spctl --assess --type execute -vv ~/Unzipped/StandIn.app 2>&1 || true
+          xattr -dr com.apple.quarantine ~/Unzipped/StandIn.app
+
       - name: First launch (sets up Python and the packages)
         run: |
           start=$(date +%s)
@@ -45,6 +56,13 @@ jobs:
           open -W -n ~/Applications/StandIn.app --args --selftest "$PWD/out/second"
           echo "second launch: $(( $(date +%s) - start )) s"
           cat out/second/report.json
+
+      - name: The unsigned app opened through Launch Services (as a double-click)
+        run: |
+          start=$(date +%s)
+          open -W -n ~/Unzipped/StandIn.app --args --selftest "$PWD/out/unsigned"
+          echo "unsigned app: $(( $(date +%s) - start )) s"
+          cat out/unsigned/report.json
 
       - name: A screenshot of the screen with the window
         continue-on-error: true
