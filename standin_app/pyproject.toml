@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "standin-app"
+version = "0.1.0"
+description = "A stand-in PySide6 + PyTorch + numba app for testing the macOS installer"
+requires-python = ">=3.11"
+# The versions are pinned by installer/requirements.txt, installed beside this package.
+dependencies = ["numpy", "numba", "torch", "pyside6", "scikit-learn"]
+
+[tool.setuptools]
+packages = ["standin_app"]

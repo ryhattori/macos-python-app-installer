@@ -1,0 +1,68 @@
+name: macOS installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-install:
+    runs-on: macos-15          # Apple Silicon
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the app and the disk image
+        run: bash installer/build_dmg.sh
+
+      - name: Install from the disk image, as a user would
+        run: |
+          mkdir -p ~/Applications
+          mount="$(hdiutil attach -nobrowse -readonly dist/StandIn-*.dmg | awk -F'\t' '/\/Volumes\// {print $NF}')"
+          echo "mounted at $mount"; ls -la "$mount"
+          cp -R "$mount/StandIn.app" ~/Applications/
+          hdiutil detach "$mount"
+          # what Gatekeeper makes of it once downloaded (a browser adds the quarantine flag)
+          xattr -w com.apple.quarantine "0083;$(printf %x $(date +%s));Safari;" ~/Applications/StandIn.app
+          spctl --assess --type execute -vv ~/Applications/StandIn.app 2>&1 || true
+          codesign -dv ~/Applications/StandIn.app 2>&1 || true
+          xattr -dr com.apple.quarantine ~/Applications/StandIn.app   # (what "Open Anyway" amounts to)
+
+      - name: First launch (sets up Python and the packages)
+        run: |
+          start=$(date +%s)
+          ~/Applications/StandIn.app/Contents/MacOS/StandIn --selftest out/first
+          echo "first launch: $(( $(date +%s) - start )) s"
+          tail -5 ~/Library/Application\ Support/StandIn/setup.log
+          du -sh ~/Library/Application\ Support/StandIn/* || true
+
+      - name: Second launch, through Launch Services (as a double-click)
+        run: |
+          start=$(date +%s)
+          open -W -n ~/Applications/StandIn.app --args --selftest "$PWD/out/second"
+          echo "second launch: $(( $(date +%s) - start )) s"
+          cat out/second/report.json
+
+      - name: A screenshot of the screen with the window
+        continue-on-error: true
+        run: |
+          ~/Applications/StandIn.app/Contents/MacOS/StandIn &
+          pid=$!
+          sleep 8
+          screencapture -x out/screen.png || echo "screencapture failed"
+          kill $pid || true
+
+      - name: numba's threading layer -- which way gives it OpenMP
+        run: ~/Library/Application\ Support/StandIn/env/bin/python -m standin_app.openmp | tee out/numba_layers.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-installer-results
+          path: |
+            out/
+            dist/*.dmg
+            ~/Library/Application Support/StandIn/setup.log
