@@ -37,9 +37,17 @@ reopen() {
     fi
 }
 
+tidy() {
+    # this update's staging folder (the script's own: bash has it open, so it may go), when it is the app's
+    local here
+    here="$(cd "$(dirname "$0")" && pwd)"
+    case "$here" in "$UPD_DATA"/update-*) rm -rf "$here" ;; esac
+}
+
 fail() {
-    echo "FAILED: $1"
     rm -rf "$NEW"
+    tidy
+    echo "FAILED: $1"
     /usr/bin/osascript -e "display alert \"$UPD_NAME was not updated\" message \"$1. $UPD_NAME is as it was before. Details: $UPD_LOG\"" \
         >/dev/null 2>&1 || true
     reopen
@@ -91,6 +99,7 @@ give_numba_openmp "$ENV/bin/python"
 if [ -n "${UPD_WARM:-}" ]; then
     "$ENV/bin/python" -m "$UPD_WARM" || echo "(the warm-up failed; the app compiles what it needs when first used)"
 fi
+tidy
 echo "=== $(date) updated"
 notify "$UPD_NAME is updated."
 reopen

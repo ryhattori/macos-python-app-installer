@@ -113,11 +113,12 @@ jobs:
           # (no app open: a process number that is not running; no bundle id: the app is not opened again)
           MACAPP_DATA="$DATA" MACAPP_UV="$DATA/bin/uv" MACAPP_BUNDLE_ID="" \
             "$DATA/env/bin/python" -m standin_app.update out/v2/*.whl out/bad-requirements.txt --wait-pid 99999
-          for i in $(seq 1 120); do [ "$(grep -c FAILED "$DATA/update.log")" -ge 1 ] && break; sleep 2; done
+          for i in $(seq 1 120); do grep -q FAILED "$DATA/update.log" && ! pgrep -f macos_update.sh && break; sleep 2; done
           tail -5 "$DATA/update.log"
           grep -q "FAILED: the packages could not be installed" "$DATA/update.log"
           test ! -e "$DATA/env.update"
           "$DATA/env/bin/python" -c "from importlib import metadata; v = metadata.version('standin-app'); print('still', v); assert v == '0.2.0'"
+          ls "$DATA"; test -z "$(ls -d "$DATA"/update-* 2>/dev/null)"       # the staging folders tidied away
 
       - uses: actions/upload-artifact@v4
         if: always()
